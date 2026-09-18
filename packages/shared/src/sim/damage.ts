@@ -121,6 +121,27 @@ export const dropWeapon = (w: World, x: number, y: number, weapon: WeaponId, pic
     dieTick: w.tick + RESOURCE.weaponDropLifetimeTicks,
     pickupTick: w.tick + pickupDelay,
   });
+  trimWeaponDrops(w);
+};
+
+/**
+ * 바닥의 무기가 상한을 넘으면 가장 오래된 것부터 치운다.
+ *
+ * 수명만으로는 난전 중에 몰려 쌓이는 것을 못 막는다. 방금 떨어진 전리품이
+ * 눈에 띄어야 "죽이면 뺏는다"는 규칙이 화면에서 읽힌다.
+ */
+const trimWeaponDrops = (w: World): void => {
+  let count = 0;
+  for (const d of w.drops) if (d.kind === 'weapon') count++;
+  let over = count - RESOURCE.maxWeaponDrops;
+  if (over <= 0) return;
+  // drops는 생성 순서대로 쌓이므로 앞에서부터 지우면 오래된 것부터 사라진다.
+  for (let i = 0; i < w.drops.length && over > 0; i++) {
+    if (w.drops[i].kind !== 'weapon') continue;
+    w.drops.splice(i, 1);
+    i--;
+    over--;
+  }
 };
 
 /**

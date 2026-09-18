@@ -80,30 +80,33 @@ export const updateOutpost = (w: World): void => {
   o.contested = teams.length > 1;
 
   /**
-   * 누적 보유 시간은 **실효 지배**를 센다. 깃발이 누구 것이냐가 아니라
-   * 지금 그 자리를 혼자 쓰고 있느냐다.
+   * **점령했으면 지키러 서 있지 않아도 된다.**
    *
-   * 처음에는 소유자만 쌓게 했는데, 개인전에서 판이 통째로 멈췄다 — 여섯 명이
-   * 전부 남남이라 아무도 혼자가 되지 못하고, 실측으로 297초 중 292초가 경합이었다.
-   * 소유권이 한 번도 안 넘어가니 시간도 한 번도 안 쌓였다. 혼자 선 순간순간을
-   * 인정해 주면, 점령을 끝내지 못해도 판이 결론에 도달한다.
+   * 예전에는 그 자리에 서 있는 동안만 시간이 쌓였다. 그래서 고지를 먹고도
+   * 한 발짝도 못 움직였고, 점령이라기보다 인질극에 가까웠다.
+   *
+   * 지금은 **주인인 동안 계속 쌓인다.** 멈추는 경우는 하나뿐이다 —
+   * **적이 고지에 올라와 있을 때.** 뺏기려면 남이 와야 하고, 시계를 멈추려면
+   * 적어도 발은 들여놔야 한다. 규칙이 한 문장으로 끝난다.
    */
-  if (o.contested) {
-    // 아무도 실효 지배하지 못한다. 주인이어도 못 쌓는다.
-  } else if (teams.length === 1) {
-    w.holdTicks[teams[0]] = (w.holdTicks[teams[0]] ?? 0) + 1;
-  } else if (o.owner !== null) {
-    // 비어 있어도 깃발은 그대로다.
+  const enemyOnPoint = teams.some((t) => t !== o.owner);
+  if (o.owner !== null && !enemyOnPoint) {
     w.holdTicks[o.owner] = (w.holdTicks[o.owner] ?? 0) + 1;
+  } else if (o.owner === null && teams.length === 1) {
+    // 아직 주인이 없을 때는 혼자 서 있는 사람이 쌓는다. 개인전에서 아무도
+    // 점령을 끝내지 못한 채 판이 통째로 멈추는 것을 막는 장치다.
+    w.holdTicks[teams[0]] = (w.holdTicks[teams[0]] ?? 0) + 1;
   }
 
   if (o.contested) return;
 
   if (teams.length === 0) {
-    // 아무도 없으면 진행도가 천천히 되돌아간다. 잠깐 들렀다 간 사람의
-    // 진행도가 라운드 내내 남아 있으면 마지막 1초 날치기가 가능해진다.
+    // 주인이 있으면 자리를 비워도 게이지가 꽉 찬 채로 남는다. 내 것이니까.
+    if (o.owner !== null) { o.progress = 1; o.capturing = o.owner; return; }
+    // 주인이 없을 때만 되돌아간다. 잠깐 들렀다 간 사람의 진행도가 라운드
+    // 내내 남아 있으면 마지막 1초 날치기가 가능해진다.
     o.progress = Math.max(0, o.progress - OUTPOST.decayPerTick);
-    if (o.progress === 0 && o.owner === null) o.capturing = null;
+    if (o.progress === 0) o.capturing = null;
     return;
   }
 

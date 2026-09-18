@@ -12,7 +12,8 @@ import {
   Button, LOOT, LOOT_POOL, MAP_TILES, MATCH, MINING, OUTPOST, PLAYER, Phase, RESOURCE,
   STRUCTURES, TICK_HZ, TILE, TILES, Tile, WeaponId, looksDiggable, secs,
   WEAPONS, applyAction, build, circleFits, createPlayer, createWorld, decodeRLE, dropHeld,
-  damageTile, dropHealth, encodeRLE, ffaMode, generateMap, getTile, killPlayer, lootOdds,
+  damageTile, dropHealth, dropResource, dropWeapon, encodeRLE, ffaMode, generateMap, getTile,
+  killPlayer, lootOdds, pickSpawn,
   ModeId, pickup, respawn, rollTileHealth,
   rollTileLoot, rollWeapon, standings, startRound, stepWorld, teamMode, tileCenter, tileDps,
   tileIndex,
@@ -412,6 +413,37 @@ test('근접 공격은 정면의 적에게만 맞는다', () => {
   assert.equal(behind.hp, PLAYER.maxHp, '등 뒤의 적이 맞았다');
 });
 
+test('몸이 붙으면 각도와 무관하게 맞는다', () => {
+  // 4px 떨어진 상대가 옆으로 조금만 움직여도 조준 각이 60° 벌어져서,
+  // 분명히 맞붙어 있는데 헛스윙이 나던 문제. 실측으로 확인하고 고쳤다.
+  for (const deg of [0, 60, 90, 135, 180]) {
+    const w = combatWorld();
+    clearArea(w, 40, 40, 3);
+    const a = addPlayerAt(w, 1, 0, 40, 40, WeaponId.DAGGER);
+    const foe = addPlayerAt(w, 2, 1, 40, 40);
+    const r = (deg * Math.PI) / 180;
+    foe.x = a.x + Math.cos(r) * 6;
+    foe.y = a.y + Math.sin(r) * 6;
+    a.input.aim = 0;
+    hold(a, Button.PRIMARY);
+    run(w, teamMode, 20);
+    assert.ok(foe.hp < PLAYER.maxHp, `몸이 겹쳤는데 ${deg}° 방향이라고 안 맞는다`);
+  }
+});
+
+test('멀어지면 다시 부채꼴을 따진다', () => {
+  // 근접 예외가 사거리 전체로 번지면 등 뒤도 맞는 무기가 된다.
+  const w = combatWorld();
+  clearArea(w, 40, 40, 4);
+  const a = addPlayerAt(w, 1, 0, 40, 40, WeaponId.DAGGER);
+  const behind = addPlayerAt(w, 2, 1, 40, 40);
+  behind.x = a.x - 30;
+  a.input.aim = 0;
+  hold(a, Button.PRIMARY);
+  run(w, teamMode, 20);
+  assert.equal(behind.hp, PLAYER.maxHp, '등 뒤의 적이 맞았다');
+});
+
 test('같은 팀은 때릴 수 없다', () => {
   const w = combatWorld();
   clearArea(w, 40, 40, 4);
@@ -640,16 +672,42 @@ test('실제로 파서 뚫으면 전리품 판정이 돈다', () => {
   assert.ok(rate < 0.5, `너무 자주 나온다 (${(rate * 100).toFixed(1)}%)`);
 });
 
-test('무기 드롭은 자원 드롭보다 훨씬 오래 남는다', () => {
-  // 곡괭이를 놓고 다른 걸 들었다가 나중에 되찾는 플레이가 성립해야 한다.
-  assert.ok(RESOURCE.weaponDropLifetimeTicks > RESOURCE.dropLifetimeTicks * 5);
+test('무기 드롭은 되찾을 만큼 남되, 영원하지는 않다', () => {
+  // 너무 짧으면 "곡괭이 놓고 갔다가 되찾기"가 안 되고,
+  // 너무 길면 맵이 무기로 뒤덮인다(실측 최대 32개).
+  const secondsLeft = RESOURCE.weaponDropLifetimeTicks / TICK_HZ;
+  assert.ok(secondsLeft >= 30, `${secondsLeft}초 — 되찾으러 갈 시간이 없다`);
+  assert.ok(secondsLeft <= 120, `${secondsLeft}초 — 지나간 싸움의 잔해가 안 치워진다`);
 
   const w = combatWorld();
   clearArea(w, 40, 40, 2);
   const p = addPlayerAt(w, 1, 0, 40, 40, WeaponId.DAGGER);
   dropHeld(w, p);
   const drop = w.drops.find((d) => d.kind === 'weapon');
-  assert.ok(drop.dieTick - w.tick > RESOURCE.dropLifetimeTicks * 5);
+  assert.ok(drop.dieTick - w.tick > RESOURCE.dropLifetimeTicks * 0.5);
+});
+
+test('바닥의 무기가 상한을 넘으면 오래된 것부터 치워진다', () => {
+  const w = combatWorld();
+  clearArea(w, 40, 40, 2);
+  for (let i = 0; i < RESOURCE.maxWeaponDrops + 8; i++) {
+    dropWeapon(w, tileCenter(40), tileCenter(40), WeaponId.DAGGER);
+  }
+  const onGround = w.drops.filter((d) => d.kind === 'weapon');
+  assert.equal(onGround.length, RESOURCE.maxWeaponDrops, '무기가 무한정 쌓인다');
+  // 남은 것이 최근 것이어야 한다 — 방금 떨어뜨린 전리품이 사라지면 안 된다.
+  const ids = onGround.map((d) => d.id);
+  assert.equal(Math.min(...ids) > 8, true, '최근 드롭이 아니라 옛것이 남았다');
+});
+
+test('상한은 자원 드롭까지 지우지는 않는다', () => {
+  const w = combatWorld();
+  clearArea(w, 40, 40, 2);
+  dropResource(w, tileCenter(40), tileCenter(40), 'ore', 5);
+  for (let i = 0; i < RESOURCE.maxWeaponDrops + 5; i++) {
+    dropWeapon(w, tileCenter(40), tileCenter(40), WeaponId.SPEAR);
+  }
+  assert.equal(w.drops.filter((d) => d.kind === 'ore').length, 1, '광석이 같이 지워졌다');
 });
 
 // ── 구급품 ───────────────────────────────────────────────────────────────────
@@ -925,6 +983,35 @@ test('남이 점령해 둔 곳이어도 걸리는 시간은 똑같이 10초다',
     Math.abs(took - OUTPOST.captureTicks) <= 2,
     `${took}틱 걸렸다 — 규칙을 "혼자 10초" 한 문장으로 설명할 수 없게 된다`,
   );
+});
+
+test('점령한 뒤에는 자리를 떠도 시간이 계속 쌓인다', () => {
+  // 서 있는 동안만 쌓으면 점령이 아니라 인질극이 된다.
+  const w = hillWorld();
+  const p = standOnHill(w, 1, 0);
+  run(w, teamMode, OUTPOST.captureTicks + 2);
+  assert.equal(w.outpost.owner, 0);
+
+  const banked = w.holdTicks[0];
+  p.x = tileCenter(w.outpost.tx) + OUTPOST.radius * 4;   // 멀리 떠난다
+  run(w, teamMode, secs(5));
+
+  assert.ok(w.holdTicks[0] > banked + secs(4), '떠났더니 시간이 안 쌓인다');
+  assert.equal(w.outpost.owner, 0, '떠났다고 주인이 바뀌었다');
+  assert.equal(w.outpost.progress, 1, '떠났더니 게이지가 줄었다');
+});
+
+test('적이 고지에 올라오면 그때 시계가 멈춘다', () => {
+  const w = hillWorld();
+  const mine = standOnHill(w, 1, 0);
+  run(w, teamMode, OUTPOST.captureTicks + 2);
+  mine.x = tileCenter(w.outpost.tx) + OUTPOST.radius * 4;
+
+  standOnHill(w, 2, 1);           // 적이 발을 들인다
+  const banked = w.holdTicks[0];
+  run(w, teamMode, secs(3));
+
+  assert.equal(w.holdTicks[0], banked, '적이 올라왔는데 시간이 계속 쌓인다');
 });
 
 test('두 팀이 함께 서 있으면 경합이라 아무도 못 먹는다', () => {
@@ -1209,6 +1296,33 @@ test('기지마다 스폰 자리가 여럿이고, 리스폰은 적에게서 먼 
     Math.hypot(p.x - mine[0].x, p.y - mine[0].y) > 1,
     '적이 밟고 선 자리에 그대로 나왔다',
   );
+});
+
+test('라운드 시작에 팀원이 같은 자리에 겹쳐 나오지 않는다', () => {
+  // 적이 아무도 안 살아 있는 라운드 시작에는 모든 자리의 점수가 같아서,
+  // 늘 첫 후보만 뽑히면 팀원 전원이 한 픽셀에 포개진다.
+  const w = combatWorld();
+  const seen = new Set();
+  for (let i = 0; i < 40; i++) {
+    const spot = pickSpawn(w, 0);
+    seen.add(`${Math.round(spot.x)},${Math.round(spot.y)}`);
+  }
+  assert.ok(seen.size > 1, `40번 뽑았는데 자리가 ${seen.size}곳뿐이다`);
+});
+
+test('라운드마다 진영이 바뀔 수 있다', () => {
+  // 늘 같은 쪽에서 시작하면 두 번째 라운드부터 길을 외운 쪽이 유리하다.
+  const sideOf = (seed) => {
+    const m = generateMap({ seed, mode: ModeId.TEAM, spawnCount: 2 });
+    const zero = m.spawns.find((s) => s.team === 0);
+    return zero.x > (MAP_TILES * TILE) / 2 ? 'right' : 'left';
+  };
+  const sides = new Set();
+  for (let seed = 1; seed <= 30; seed++) sides.add(sideOf(seed));
+  assert.equal(sides.size, 2, '어떤 시드에서도 0팀이 늘 같은 쪽이다');
+
+  // 같은 시드는 같은 배치여야 한다(결정적).
+  assert.equal(sideOf(7), sideOf(7));
 });
 
 test('FFA 팀 번호는 스폰 번호 범위 안에서만 배정된다', () => {

@@ -133,22 +133,39 @@ export const createPlayer = (
   return p;
 };
 
-/** 팀의 스폰 지점 중 적이 가장 먼 곳. 스폰킬을 구조적으로 줄인다. */
+/**
+ * 팀의 스폰 지점 중 적이 가장 먼 곳. 스폰킬을 구조적으로 줄인다.
+ *
+ * 동점이면 **무작위로** 고른다. 예전에는 늘 첫 후보를 집어서, 적이 아무도
+ * 살아 있지 않은 라운드 시작 때 팀원 전원이 같은 자리에 겹쳐 나왔다.
+ * 자리를 여럿 만들어 둔 의미가 없었다.
+ */
 export const pickSpawn = (w: World, team: TeamId): { x: number; y: number } => {
   const mine = w.spawns.filter((s) => s.team === team);
   const candidates = mine.length > 0 ? mine : w.spawns;
-  let best = candidates[0];
-  let bestScore = -Infinity;
+
+  // 적이 하나도 없으면 모든 자리의 점수가 같다. 그 값을 Infinity로 두면
+  // `Infinity - 1 === Infinity`라서 동점 판정이 통째로 무너진다(실제로 당했다).
+  // 맵을 가로지르는 거리보다 큰 유한한 값을 쓴다.
+  const FAR = MAP_SIZE_PX * 2;
+
+  let bestScore = -1;
+  let best: typeof candidates = [];
   for (const c of candidates) {
-    let nearest = Infinity;
+    let nearest = FAR;
     for (const p of w.players.values()) {
       if (!p.alive || p.team === team) continue;
       const d = Math.hypot(p.x - c.x, p.y - c.y);
       if (d < nearest) nearest = d;
     }
-    if (nearest > bestScore) { bestScore = nearest; best = c; }
+    // 완전히 같을 때만이 아니라 "비슷하면" 같은 급으로 본다. 픽셀 단위로
+    // 갈리는 차이 때문에 매번 같은 자리가 뽑히는 것을 막는다.
+    if (nearest > bestScore + 1) { bestScore = nearest; best = [c]; }
+    else if (nearest > bestScore - 1) best.push(c);
   }
-  return { x: best.x, y: best.y };
+
+  const pick = best[Math.floor(Math.random() * best.length)] ?? candidates[0];
+  return { x: pick.x, y: pick.y };
 };
 
 export const respawn = (w: World, p: Player): void => {

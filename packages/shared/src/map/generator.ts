@@ -160,6 +160,9 @@ export const generateMap = ({ seed, mode, spawnCount }: GenerateOptions): Genera
   const spawns: GeneratedMap['spawns'] = [];
   const cores: GeneratedMap['cores'] = [];
   const baseR = baseRadius(mode);
+  // 라운드마다 진영이 바뀐다. 시드에서 나오므로 같은 시드면 같은 배치다.
+  // 늘 같은 쪽에서 시작하면 두 번째 라운드부터는 길을 외운 사람이 유리하다.
+  const sideSwap = mode === ModeId.TEAM && rnd() < 0.5 ? 1 : 0;
   for (let k = 0; k < n; k++) {
     const a = step * k;
     const bx = CENTER + Math.cos(a) * BASE_ORBIT;
@@ -170,7 +173,7 @@ export const generateMap = ({ seed, mode, spawnCount }: GenerateOptions): Genera
       { angle: a, halfWidth: 0.2 },            // 뒷문(맵 바깥 방향)
     ]);
 
-    const team: TeamId = mode === ModeId.TEAM ? k % 2 : k;
+    const team: TeamId = mode === ModeId.TEAM ? (k + sideSwap) % 2 : k;
     // 기지마다 스폰 지점을 여럿 둔다. 하나뿐이면 팀원 넷이 같은 픽셀에 겹쳐 나오고,
     // 적이 입구를 잡았을 때 고를 여지가 사라진다.
     const seats = 3;

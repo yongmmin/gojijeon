@@ -44,6 +44,8 @@ const playRound = (seed) => {
     kills: 0,
     // 고지가 왜 안 먹히는지는 "아무도 안 왔다"와 "와서 서로 막았다"가
     // 완전히 다른 문제다. 둘을 구분할 수 있어야 규칙을 고칠지 봇을 고칠지 안다.
+    peakWeaponDrops: 0,
+    dropsFromDeath: 0,
     occupiedTicks: 0,
     contestedTicks: 0,
     maxTeamsOnPoint: 0,
@@ -70,10 +72,13 @@ const playRound = (seed) => {
       if (teams.size > 1) stats.contestedTicks++;
       if (teams.size > stats.maxTeamsOnPoint) stats.maxTeamsOnPoint = teams.size;
     }
+    const onGround = w.drops.filter((d) => d.kind === 'weapon').length;
+    if (onGround > stats.peakWeaponDrops) stats.peakWeaponDrops = onGround;
+
     for (const e of w.events) {
       if (e.t === 'tileBroken') stats.tilesBroken++;
       else if (e.t === 'loot') stats.weaponsFound++;
-      else if (e.t === 'death') stats.kills++;
+      else if (e.t === 'death') { stats.kills++; if (e.weapon) stats.dropsFromDeath++; }
       else if (e.t === 'capture') {
         stats.captures++;
         if (stats.firstCaptureTick === null) stats.firstCaptureTick = w.tick;
@@ -115,7 +120,8 @@ for (let i = 0; i < RUNS; i++) {
   console.log(`    보유: ${r.hold}`);
   console.log(`    코어: ${r.cores}`);
   console.log(`    현장: 첫 도착 ${r.firstArrival} · 누가 서 있던 시간 ${secsOf(r.occupiedTicks)}초 (그중 경합 ${secsOf(r.contestedTicks)}초) · 동시 최대 ${r.maxTeamsOnPoint}팀`);
-  console.log(`    굴착 ${r.tilesBroken}칸 · 무기 발굴 ${r.weaponsFound}개 · 사망 ${r.kills}회`);
+  console.log(`    굴착 ${r.tilesBroken}칸 · 무기 발굴 ${r.weaponsFound}개 · 사망 ${r.kills}회(무기 흘림 ${r.dropsFromDeath})`);
+  console.log(`    바닥에 널린 무기 최대 ${r.peakWeaponDrops}개`);
   console.log(`    점수: ${JSON.stringify(r.score)}\n`);
 }
 

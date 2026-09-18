@@ -6,13 +6,24 @@
  * 덕분에 "채굴 버튼"과 "공격 버튼"을 나눌 필요가 없고, 곡괭이를 든 채
  * 적을 만났을 때의 무력함이 규칙이 아니라 수치에서 자연스럽게 나온다.
  */
-import { DT, MINING, TILE, BUILDING } from '../config/balance.js';
+import { DT, MINING, PLAYER, TILE, BUILDING } from '../config/balance.js';
 import { angleDelta, dist2, inBounds, tileIndex, toTileX, toTileY } from '../math.js';
 import { Tile } from '../tiles.js';
 import { STARTING_WEAPON, swingSeconds, tileDps, weaponDef, type WeaponDef, type WeaponId } from '../weapons.js';
 import type { Player, Projectile, World } from '../types.js';
 import { circleFits, getTile, nextId } from './world.js';
 import { coreAt, damagePlayer, damageTile } from './damage.js';
+
+/**
+ * 이 거리 안에서는 부채꼴을 따지지 않는다.
+ *
+ * 몸이 겹칠 만큼 붙으면 각도가 무의미해진다. 4px 떨어진 상대가 살짝
+ * 옆으로 움직이는 것만으로 조준 각과 60°가 벌어지고, 그러면 **분명히
+ * 맞붙어 있는데 헛스윙**이 난다. 실측으로 확인한 문제다.
+ *
+ * 붙어 있으면 맞는다 — 그게 눈에 보이는 것과 일치한다.
+ */
+const POINT_BLANK = PLAYER.radius * 1.8;
 
 /** 곡괭이의 초당 굴착 속도. 다른 무기의 대체 굴착은 여기서 비례로 끌어온다. */
 const PICKAXE_TILE_DPS = tileDps(weaponDef(STARTING_WEAPON));
@@ -90,8 +101,10 @@ export const resolveSwing = (w: World, p: Player): void => {
     if (other.id === p.id || !other.alive || !isEnemy(p, other)) continue;
     const d2 = dist2(p.x, p.y, other.x, other.y);
     if (d2 > (range + 11) ** 2 || d2 > bestD) continue;
-    const a = Math.atan2(other.y - p.y, other.x - p.x);
-    if (Math.abs(angleDelta(a, p.aim)) > halfArc) continue;
+    if (d2 > POINT_BLANK * POINT_BLANK) {
+      const a = Math.atan2(other.y - p.y, other.x - p.x);
+      if (Math.abs(angleDelta(a, p.aim)) > halfArc) continue;
+    }
     best = other; bestD = d2;
   }
   if (best) damagePlayer(w, best, damage, p.id, p.x, p.y);
