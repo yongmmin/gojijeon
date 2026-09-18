@@ -1,0 +1,34 @@
+{
+  "name": "gojijeon",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LAN 4~8인 실시간 대전 게임 — 무기 하나, 땅굴, 자원",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:shared": "npm run build -w @gojijeon/shared",
+    "build:client": "npm run build -w @gojijeon/client",
+    "build": "npm run build:shared && npm run build:server && npm run build:client",
+    "host": "npm run build && npm run start -w @gojijeon/server",
+    "dev:server": "npm run dev -w @gojijeon/server",
+    "dev:client": "npm run dev -w @gojijeon/client",
+    "dev": "npm run build:shared && concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "typecheck": "tsc -b packages/shared packages/server packages/client",
+    "test": "node --test packages/shared/test/*.test.js",
+    "build:server": "npm run build -w @gojijeon/server",
+    "test:e2e": "npm run build:shared && npm run build:server && node --test --test-timeout=30000 packages/server/test/*.test.js",
+    "test:all": "npm test && npm run test:e2e",
+    "bot": "node tools/bot.mjs",
+    "sim": "node tools/simulate.mjs",
+    "mapshot": "node tools/mapshot.mjs",
+    "digcheck": "node tools/digcheck.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  }
+}

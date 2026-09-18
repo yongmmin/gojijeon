@@ -1,0 +1,19 @@
+{
+  "name": "@gojijeon/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js",
+    "dev": "concurrently -n tsc,node -c gray,cyan \"tsc -b --watch --preserveWatchOutput\" \"node --watch dist/main.js\""
+  },
+  "dependencies": {
+    "@gojijeon/shared": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13"
+  }
+}

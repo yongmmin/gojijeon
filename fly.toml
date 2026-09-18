@@ -1,0 +1,33 @@
+# Fly.io 배포 설정.
+#
+# 지연이 승패를 가르는 게임이라 **리전 선택이 가장 중요하다.**
+# 팀이 한국에 있으면 나리타(nrt)가 가장 가깝다. 멀리 두면 조작이 굼떠진다.
+app = "gojijeon"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # 방이 메모리에 있다. 컨테이너가 자면 진행 중인 판이 사라지므로 재우지 않는다.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.http_options.response]
+    pristine = true
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[[vm]]
+  # 20Hz 틱 × 방 몇 개면 이 정도로 충분하다. 모자라면 cpus를 올린다.
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
