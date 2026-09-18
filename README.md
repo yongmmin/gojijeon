@@ -274,6 +274,60 @@ node tools/bot.mjs ABCD 3 8081
 
 ---
 
+## 배포
+
+이 게임은 **방 상태를 메모리에 들고 20Hz로 도는 WebSocket 서버**입니다.
+그래서 정적 호스팅이나 서버리스에는 올라가지 않습니다.
+
+| | 가능? | 이유 |
+|---|---|---|
+| GitHub Pages · Vercel · Netlify | ❌ | 정적/서버리스. 상태 있는 소켓 서버를 못 띄웁니다 |
+| Fly.io · Railway · Render | ✅ | 컨테이너 하나면 됩니다 |
+| VPS (Lightsail · Vultr · Oracle) | ✅ | `docker run` 한 줄 |
+
+### 리전이 전부입니다
+
+지연이 조작 감각을 그대로 결정합니다. **플레이어와 가까운 리전**에 두세요.
+
+| | RTT | 입력 → 화면 |
+|---|---|---|
+| 사내 LAN | 2ms | 69ms |
+| 서울 | 8ms | 75ms |
+| 도쿄 (Fly `nrt`) | 35ms | 102ms |
+| 싱가포르 | 75ms | 142ms |
+| 미국 서부 | 130ms | 197ms |
+
+내 캐릭터는 보간을 건너뛰고 최신 위치로 수렴시킵니다
+([`selfPose.ts`](packages/client/src/net/selfPose.ts)). 남의 캐릭터에만 80ms
+보간이 걸립니다 — 남을 보는 부드러움과 내 손이 붙는 느낌은 다른 요구입니다.
+
+### Docker
+
+```bash
+docker build -t gojijeon .
+docker run -p 8080:8080 -e PUBLIC_URL="http://내주소:8080" gojijeon
+```
+
+`PUBLIC_URL`을 주면 시작 배너가 컨테이너 내부 IP 대신 그 주소를 찍습니다.
+
+### Fly.io
+
+```bash
+flyctl auth login          # 직접 로그인해야 합니다
+flyctl apps create gojijeon --org personal
+flyctl deploy
+```
+
+[`fly.toml`](fly.toml)에 도쿄 리전(`nrt`)과 `/health` 헬스체크가 잡혀 있고,
+**컨테이너를 재우지 않도록** 해두었습니다 — 방이 메모리에 있어서 자면
+진행 중인 판이 사라집니다.
+
+> 머신이 하나여야 합니다. 여러 대로 늘리면 접속이 분산되면서
+> **같은 코드를 친 사람이 서로 다른 머신의 다른 방에 들어갑니다.**
+> 여러 대가 필요해지면 방 상태를 Redis 같은 곳으로 빼야 합니다.
+
+---
+
 ## 아직 없는 것
 
 - **시야(전장의 안개)** — `VISION.enabled`가 `false`입니다. 전체가 보입니다.
