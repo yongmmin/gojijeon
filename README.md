@@ -274,63 +274,57 @@ node tools/bot.mjs ABCD 3 8081
 
 ---
 
-## 배포
+## 밖에서 같이 하기
 
 이 게임은 **방 상태를 메모리에 들고 20Hz로 도는 WebSocket 서버**입니다.
-그래서 정적 호스팅이나 서버리스에는 올라가지 않습니다.
+그래서 GitHub Pages나 서버리스(Vercel·Netlify)에는 올라가지 않습니다.
+늘 떠 있는 프로세스가 필요합니다.
 
-| | 가능? | 이유 |
-|---|---|---|
-| GitHub Pages · Vercel · Netlify | ❌ | 정적/서버리스. 상태 있는 소켓 서버를 못 띄웁니다 |
-| Fly.io · Railway · Render | ✅ | 컨테이너 하나면 됩니다 |
-| VPS (Lightsail · Vultr · Oracle) | ✅ | `docker run` 한 줄 |
+가장 간단한 방법은 **호스트 PC에서 서버를 그대로 돌리고 터널로 외부에
+노출**하는 것입니다. 계정도 카드도 필요 없습니다.
 
-### 리전이 전부입니다
+```bash
+npm run host                                   # 서버를 띄운다 (8080 또는 빈 포트)
+cloudflared tunnel --url http://localhost:8080 # 다른 터미널에서
+```
 
-지연이 조작 감각을 그대로 결정합니다. **플레이어와 가까운 리전**에 두세요.
+`https://무작위-이름.trycloudflare.com` 주소가 출력됩니다. 그 주소를 팀원에게
+주면 어디서든 들어옵니다. 실측으로 Cloudflare 서울 엣지를 거쳐 **48ms**가
+나왔습니다.
 
-| | RTT | 입력 → 화면 |
-|---|---|---|
-| 사내 LAN | 2ms | 69ms |
-| 서울 | 8ms | 75ms |
-| 도쿄 (Fly `nrt`) | 35ms | 102ms |
-| 싱가포르 | 75ms | 142ms |
-| 미국 서부 | 130ms | 197ms |
+- 터널을 띄운 **PC가 켜져 있어야** 합니다
+- 터널을 끄면 주소가 사라지고, 다시 켜면 **새 주소**가 나옵니다
+  (고정 주소가 필요하면 Cloudflare 계정을 만들어 named tunnel로 바꿉니다)
+- **같은 사무실에 있다면 LAN 주소가 더 빠릅니다** — 터널은 서울을 한 번
+  경유하므로, 사내에서는 `npm run host`가 찍어 주는 주소를 그대로 쓰세요
 
-내 캐릭터는 보간을 건너뛰고 최신 위치로 수렴시킵니다
-([`selfPose.ts`](packages/client/src/net/selfPose.ts)). 남의 캐릭터에만 80ms
-보간이 걸립니다 — 남을 보는 부드러움과 내 손이 붙는 느낌은 다른 요구입니다.
+### 컨테이너로 올리고 싶다면
 
-### Docker
+[`Dockerfile`](Dockerfile)이 있습니다. 컨테이너 하나로 끝나므로 어떤 호스트든
+올라갑니다.
 
 ```bash
 docker build -t gojijeon .
-docker run -p 8080:8080 -e PUBLIC_URL="http://내주소:8080" gojijeon
+docker run -p 8080:8080 -e PUBLIC_URL="https://내주소" gojijeon
 ```
 
 `PUBLIC_URL`을 주면 시작 배너가 컨테이너 내부 IP 대신 그 주소를 찍습니다.
 
-### Fly.io
+> **반드시 인스턴스 한 대로 띄우세요.** 방이 메모리에 있어서 두 대가 뜨면
+> 같은 코드를 친 사람이 서로 다른 인스턴스의 다른 방에 들어가 영영 못 만납니다.
+> 여러 대가 필요해지면 방 상태를 Redis 같은 곳으로 빼야 합니다.
 
-```bash
-flyctl auth login                          # 직접 로그인해야 합니다
-flyctl apps create gojijeon --org personal
-npm run deploy                             # = flyctl deploy --remote-only --ha=false
-npm run deploy:check                       # 머신이 정말 한 대인지 확인
-```
+### 지연은 거리가 결정합니다
 
-**`fly deploy`를 맨손으로 치지 마세요.** Fly가 고가용성 명목으로 두 번째
-머신을 자동으로 띄웁니다. `npm run deploy`에 `--ha=false`를 박아 둔 이유입니다.
+클라 예측을 넣지 않았으므로(LAN 기준으로 설계) 왕복 지연이 그대로 체감됩니다.
+다만 **내 캐릭터는 보간을 건너뛰고** 최신 위치로 수렴시킵니다
+([`selfPose.ts`](packages/client/src/net/selfPose.ts)) — 남을 보는 부드러움과
+내 손이 붙는 느낌은 다른 요구이기 때문입니다.
 
-[`fly.toml`](fly.toml)에 도쿄 리전(`nrt`)과 `/health` 헬스체크가 잡혀 있고,
-**컨테이너를 재우지 않도록** 해두었습니다 — 방이 메모리에 있어서 자면
-진행 중인 판이 사라집니다.
-
-> **머신은 반드시 한 대여야 합니다.** 여러 대로 늘리면 접속이 분산되면서
-> 같은 코드를 친 사람이 서로 다른 머신의 다른 방에 들어가 영영 못 만납니다.
-> 실제로 첫 배포에서 Fly가 두 대를 띄워 이 문제를 만들었고, 그래서
-> 배포 명령에 `--ha=false`를 고정했습니다.
-> 여러 대가 정말 필요해지면 방 상태를 Redis 같은 곳으로 빼야 합니다.
+| | RTT | 입력 → 화면 |
+|---|---|---|
+| 사내 LAN | 2ms | 69ms |
+| Cloudflare 터널 (서울 엣지) | 46ms | 약 95ms |
 
 ---
 

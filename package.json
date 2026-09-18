@@ -25,9 +25,7 @@
     "bot": "node tools/bot.mjs",
     "sim": "node tools/simulate.mjs",
     "mapshot": "node tools/mapshot.mjs",
-    "digcheck": "node tools/digcheck.mjs",
-    "deploy": "flyctl deploy --remote-only --ha=false",
-    "deploy:check": "flyctl machines list -a gojijeon"
+    "digcheck": "node tools/digcheck.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
