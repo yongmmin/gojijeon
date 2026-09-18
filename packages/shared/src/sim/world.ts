@@ -5,6 +5,7 @@ import { generateMap } from '../map/generator.js';
 import { inBounds, tileIndex } from '../math.js';
 import { Tile, TILES, type TileId } from '../tiles.js';
 import { STARTING_WEAPON } from '../weapons.js';
+import { clampIntoZone } from './zone.js';
 import {
   ModeId, Phase, emptyInput,
   type Player, type PlayerId, type TeamId, type World,
@@ -29,6 +30,7 @@ export const createWorld = ({ seed, mode, spawnCount, prepTicks }: CreateWorldOp
   return {
     tick: 0,
     prepTicks: prepTicks ?? MATCH.prepTicks,
+    combatTicks: MATCH.combatTicks,
     seed,
     mode,
     phase: Phase.LOBBY,
@@ -170,8 +172,9 @@ export const pickSpawn = (w: World, team: TeamId): { x: number; y: number } => {
 
 export const respawn = (w: World, p: Player): void => {
   const s = pickSpawn(w, p.team);
-  p.x = s.x;
-  p.y = s.y;
+  const safe = safeSpawnPoint(w, p, s);
+  p.x = safe.x;
+  p.y = safe.y;
   p.vx = 0; p.vy = 0;
   p.hp = PLAYER.maxHp;
   p.alive = true;
@@ -182,6 +185,37 @@ export const respawn = (w: World, p: Player): void => {
   p.miningTile = -1;
   p.invulnUntilTick = w.tick + PLAYER.spawnProtectTicks;
   w.events.push({ t: 'spawn', id: p.id });
+};
+
+/**
+ * 구역 안이면서 **몸이 들어가는** 자리를 찾는다.
+ *
+ * 구역이 좁아지면 기지가 붕괴 구역 밖에 남는다. 거기서 부활시키면 살아나자마자
+ * 피가 닳으므로 안으로 당겨야 하는데, 당긴 지점이 흙벽 한복판일 수 있다 —
+ * 실제로 내구 테스트에서 벽에 박힌 봇이 나왔다.
+ *
+ * 그래서 당긴 자리부터 중심 쪽으로 조금씩 옮겨 가며 첫 번째로 설 수 있는 곳을
+ * 쓴다. 끝내 못 찾으면 원래 스폰으로 돌아간다 — 구역 밖에서 피가 닳는 편이
+ * 벽에 박혀 아무것도 못 하는 것보다 낫다.
+ */
+const safeSpawnPoint = (
+  w: World, p: Player, spawn: { x: number; y: number },
+): { x: number; y: number } => {
+  const target = clampIntoZone(w, spawn.x, spawn.y);
+  if (target.x === spawn.x && target.y === spawn.y) return spawn;
+
+  const cx = MAP_SIZE_PX / 2;
+  const cy = MAP_SIZE_PX / 2;
+  const dx = cx - target.x;
+  const dy = cy - target.y;
+  const len = Math.hypot(dx, dy) || 1;
+
+  for (let step = 0; step <= 24; step++) {
+    const x = target.x + (dx / len) * step * TILE;
+    const y = target.y + (dy / len) * step * TILE;
+    if (circleFits(w, x, y, PLAYER.radius, p.team)) return { x, y };
+  }
+  return spawn;
 };
 
 export const nextId = (w: World): number => w.nextEntityId++;

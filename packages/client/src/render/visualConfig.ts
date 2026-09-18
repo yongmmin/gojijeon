@@ -158,6 +158,39 @@ export const HIT_VIS = {
   lowHpPulseMs: 1400,
 } as const;
 
+/**
+ * 붕괴 구역.
+ *
+ * 색은 피격(붉은색)과 절대 겹치면 안 된다 — 둘 다 붉으면 "맞고 있는 건지 구역
+ * 밖인지"를 구분할 수 없는데 대처가 정반대다(싸운다 vs 달린다). 자홍은 팀색·
+ * 무기색·타일색 어디에도 쓰이지 않는다.
+ */
+export const ZONE_VIS = {
+  color: '#d946ef',
+  /** 경계 바깥을 덮는 기본 진하기. 지형이 보이되 "여기 서 있으면 안 된다"가 남는 선. */
+  outsideAlpha: 0.1,
+  /** 경계선 굵기와, 안쪽으로 깔아 벽처럼 보이게 하는 빛의 굵기. */
+  edgeWidth: 4,
+  glowWidth: 26,
+  /** 좁아지는 중에만 쓰는 회전 빗금. */
+  dash: [22, 14] as readonly number[],
+  pulseMs: 900,
+
+  /** 내가 밖에 있을 때의 화면 가장자리 경고. */
+  warnAlpha: 0.34,
+  warnText: '구역 밖 — 안으로!',
+  warnFont: '800 30px system-ui, sans-serif',
+  /** 위아래 띠에만 빗금을 넣는다. 화면 전체에 치면 아무것도 안 보인다. */
+  stripeBand: 54,
+  stripeWidth: 10,
+  stripeGap: 26,
+  /** 방향 화살표 크기와 화면 중앙에서 띄우는 높이, 그 위 문구까지의 거리.
+      셋 다 내 캐릭터(화면 한가운데)를 가리지 않도록 위로만 쌓는다. */
+  arrowSize: 30,
+  arrowLift: 76,
+  textRise: 48,
+} as const;
+
 /** 고지(맵 중앙 상징물). 색은 팀색과 타일 레지스트리에서 오고 여기엔 크기만 둔다. */
 export const OUTPOST_VIS = {
   /** 상징물(오벨리스크) 크기. 밟고 서는 칸이므로 타일보다 조금 넘겨도 된다. */

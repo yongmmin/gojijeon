@@ -12,6 +12,7 @@ import { autoCollect, dropHeld, pickup } from './actions.js';
 import { updateStructures } from './structures.js';
 import { updateMatch } from './match.js';
 import { updateOutpost } from './outpost.js';
+import { updateZone } from './zone.js';
 
 const pressed = (now: number, before: number, mask: number): boolean =>
   (now & mask) !== 0 && (before & mask) === 0;
@@ -52,6 +53,7 @@ export const stepWorld = (w: World, mode: GameMode): void => {
     updateProjectiles(w);
     updateStructures(w);
     updateOutpost(w);
+    updateZone(w);
     mode.onTick?.(w);
   }
 

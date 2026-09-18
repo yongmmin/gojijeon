@@ -9,13 +9,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  Button, LOOT, LOOT_POOL, MAP_TILES, MATCH, MINING, OUTPOST, PLAYER, Phase, RESOURCE,
+  Button, LOOT, LOOT_POOL, MAP_TILES, MATCH, MINING, OUTPOST, PLAYER, Phase, RESOURCE, ZONE,
   STRUCTURES, TICK_HZ, TILE, TILES, Tile, WeaponId, looksDiggable, secs,
   WEAPONS, applyAction, build, circleFits, createPlayer, createWorld, decodeRLE, dropHeld,
   damageTile, dropHealth, dropResource, dropWeapon, encodeRLE, ffaMode, generateMap, getTile,
   killPlayer, lootOdds, pickSpawn,
   ModeId, pickup, respawn, rollTileHealth,
-  rollTileLoot, rollWeapon, standings, startRound, stepWorld, swingSeconds, teamMode,
+  isZoneShrinking, rollTileLoot, rollWeapon, standings, startRound, stepWorld, swingSeconds,
+  teamMode, zoneCenter, zoneRadius,
   tileCenter, tileDps,
   tileIndex,
 } from '@gojijeon/shared';
@@ -1262,6 +1263,103 @@ test('사람이 나가도 그 팀의 라운드 승수는 표에 남는다', () =
 
 test('정산 시간은 순위표를 읽을 만큼 준다', () => {
   assert.ok(MATCH.intermissionTicks >= secs(15), '순위표를 훑기에 짧다');
+});
+
+// ── 붕괴 구역 ────────────────────────────────────────────────────────────────
+
+test('구역은 전투가 진행되며 좁아진다', () => {
+  const w = combatWorld();
+  w.combatTicks = MATCH.combatTicks;
+
+  const at = (ratio) => {
+    w.phaseEndTick = w.tick + Math.round(w.combatTicks * (1 - ratio));
+    return zoneRadius(w);
+  };
+
+  const begin = at(0);
+  const early = at(ZONE.shrinkStartRatio - 0.05);
+  const mid = at((ZONE.shrinkStartRatio + ZONE.shrinkEndRatio) / 2);
+  const late = at(ZONE.shrinkEndRatio + 0.05);
+
+  assert.equal(begin, ZONE.startTiles * TILE, '시작부터 좁아져 있다');
+  assert.equal(early, begin, '좁아지기 전인데 벌써 줄었다');
+  assert.ok(mid < begin && mid > late, `중간값이 사이에 없다: ${mid}`);
+  assert.equal(late, ZONE.endTiles * TILE, '끝나고도 계속 줄어든다');
+});
+
+test('준비 페이즈에는 구역이 좁아지지 않는다', () => {
+  const w = combatWorld();
+  w.phase = Phase.PREP;
+  assert.equal(zoneRadius(w), ZONE.startTiles * TILE);
+  assert.equal(isZoneShrinking(w), false);
+});
+
+test('구역 밖에 있으면 피가 닳고, 안에 있으면 안 닳는다', () => {
+  const w = combatWorld();
+  w.combatTicks = MATCH.combatTicks;
+  // 다 좁아진 시점으로 보낸다.
+  w.phaseEndTick = w.tick + Math.round(w.combatTicks * (1 - ZONE.shrinkEndRatio - 0.05));
+  const r = zoneRadius(w);
+  const c = zoneCenter();
+
+  const inside = addPlayerAt(w, 1, 0, 40, 40);
+  inside.x = c.x; inside.y = c.y;
+  inside.invulnUntilTick = 0;
+
+  const outside = addPlayerAt(w, 2, 1, 40, 40);
+  outside.x = c.x + r + TILE * 4; outside.y = c.y;
+  outside.invulnUntilTick = 0;
+
+  run(w, teamMode, secs(3));
+
+  assert.equal(inside.hp, PLAYER.maxHp, '안에 있는데 피가 닳았다');
+  assert.ok(outside.hp < PLAYER.maxHp, '밖에 있는데 멀쩡하다');
+  // 뛰어 돌아올 시간은 줘야 한다.
+  const secondsToDie = PLAYER.maxHp / ZONE.damagePerSecond;
+  assert.ok(secondsToDie > 8, `${secondsToDie.toFixed(0)}초 만에 죽는다 — 돌아올 틈이 없다`);
+});
+
+test('구역이 좁아져도 벽 속에서 부활하지 않는다', () => {
+  // 구역 안으로 당긴 자리가 흙벽 한복판일 수 있다. 실제로 내구 테스트에서
+  // 벽에 박힌 봇이 나와서 잡은 문제다.
+  for (let seed = 1; seed <= 12; seed++) {
+    const w = createWorld({ seed, mode: ModeId.TEAM, spawnCount: 2 });
+    createPlayer(w, 1, 'a', 0);
+    createPlayer(w, 2, 'b', 1);
+    startRound(w, teamMode);
+    w.phase = Phase.COMBAT;
+    w.combatTicks = MATCH.combatTicks;
+    // 최대로 좁아진 상태에서 부활시킨다.
+    w.phaseEndTick = w.tick + 1;
+
+    for (const p of w.players.values()) {
+      respawn(w, p);
+      assert.ok(
+        circleFits(w, p.x, p.y, PLAYER.radius, p.team),
+        `seed ${seed}: 구역이 좁아지자 벽 속에서 부활했다 (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`,
+      );
+    }
+  }
+});
+
+test('고지 둘레에 구급품이 주기적으로 떨어진다', () => {
+  const w = combatWorld();
+  clearArea(w, w.outpost.tx, w.outpost.ty, 6);
+  const before = w.drops.filter((d) => d.kind === 'health').length;
+
+  run(w, teamMode, RESOURCE.outpostPotionTicks * 2 + 4);
+
+  const potions = w.drops.filter((d) => d.kind === 'health');
+  assert.ok(potions.length > before, '고지 근처에 구급품이 안 생긴다');
+
+  // 고지 위가 아니라 둘레에 떨어져야 한다 — 주우러 가는 동안 노출되어야
+  // 위험과 보상이 맞바뀐다.
+  const cx = tileCenter(w.outpost.tx);
+  const cy = tileCenter(w.outpost.ty);
+  for (const d of potions) {
+    const dist = Math.hypot(d.x - cx, d.y - cy);
+    assert.ok(dist < OUTPOST.radius * 2.5, `구급품이 고지에서 ${dist.toFixed(0)}px나 떨어졌다`);
+  }
 });
 
 // ── 내구 ─────────────────────────────────────────────────────────────────────

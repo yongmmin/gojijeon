@@ -4,7 +4,7 @@
  * 여기에는 게임 규칙이 없다. 보간된 서버 상태를 그리고, 누른 것을 보낼 뿐이다.
  */
 import {
-  BUILDABLE, PLAYER, Phase, TILES, Tile, type StructureId,
+  BUILDABLE, Phase, TILES, Tile, type StructureId,
 } from '@gojijeon/shared';
 import { Camera } from '../render/camera';
 import { Effects } from '../render/effects';
@@ -13,7 +13,8 @@ import { Minimap } from '../render/minimap';
 import { SwingAnim } from '../render/swingPose';
 import { TileLayer } from '../render/tileLayer';
 import { drawEntities } from '../render/entityLayer';
-import { drawHealthCompass } from '../render/dropArt';
+import { drawScreenLayer } from '../render/screenLayer';
+import { drawZone } from '../render/zoneLayer';
 import { prewarmWeaponSprites } from '../render/weaponSprites';
 import { computeGhost, drawGhost, type Ghost } from '../input/buildGhost';
 import type { SampledWorld } from '../net/snapshotBuffer';
@@ -24,7 +25,7 @@ import { Hud } from '../ui/hud';
 import { Announce } from '../ui/announce';
 import { RoundEndPanel, roundReason, type RoundResult } from '../ui/roundEndPanel';
 import { Overlay } from '../ui/overlay';
-import { updateStatusOverlay } from '../ui/statusOverlay';
+import { updatePauseMenu, updateStatusOverlay } from '../ui/statusOverlay';
 import type { Scene, SceneContext } from './scene';
 
 export class GameScene implements Scene {
@@ -41,6 +42,8 @@ export class GameScene implements Scene {
   /** 전투 개시처럼 한 프레임에 터져야 하는 알림. */
   private readonly announce = new Announce();
   private readonly result = new RoundEndPanel();
+  /** 구역이 좁아지기 시작한 순간을 한 번만 알리기 위한 기억. */
+  private wasShrinking = false;
   /** 일시정지 메뉴는 사망·라운드 종료 안내보다 위에 떠야 한다. */
   private readonly pause = new Overlay();
   private readonly loot: LootPanel;
@@ -140,6 +143,13 @@ export class GameScene implements Scene {
         this.announce.show('전투 시작', '고지로!', now);
       }
     }
+
+    // 구역이 줄기 시작하는 순간은 이벤트로 오지 않는다. 플래그가 서는 프레임을 잡는다.
+    const shrinking = world.snapshot?.zone?.shrinking ?? false;
+    if (shrinking && !this.wasShrinking) {
+      this.announce.show('구역이 좁아진다', '경계 안으로', now);
+    }
+    this.wasShrinking = shrinking;
     this.effects.ingest(events, world);
     this.hits.ingest(events, this.nowMs);
     this.effects.update(dtMs);
@@ -159,7 +169,10 @@ export class GameScene implements Scene {
     this.build.update(me, this.structure, this.buildOpen);
     updateStatusOverlay(world, this.overlay, this.hud, this.result, this.lastResult);
     this.announce.update(now);
-    this.updatePause();
+    updatePauseMenu(this.pause, this.paused, {
+      onResume: () => { this.paused = false; },
+      onLeave: () => this.leave(),
+    });
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -175,17 +188,16 @@ export class GameScene implements Scene {
     this.tiles.draw(ctx, this.cam, this.nowMs);
     drawEntities(ctx, world, this.sample, this.cam, { nowMs: this.nowMs, anim: this.anim, hits: this.hits });
     if (this.ghost) drawGhost(ctx, this.ghost, this.structure);
+    // 구역은 개체 위에 덮는다 — 밖에 서 있는 사람도 같이 어두워져야 위험해 보인다.
+    const zone = world.snapshot?.zone;
+    if (zone) drawZone(ctx, zone, this.cam, this.nowMs);
     this.effects.render(ctx);
     ctx.restore();
 
-    this.minimap.draw(ctx, world, this.cam, view.w);
-
-    const me = world.me;
-    if (me && me.alive) {
-      const snap = world.snapshot;
-      if (snap) drawHealthCompass(ctx, snap.drops, me, this.cam, view.w, view.h, this.nowMs);
-    }
-    this.effects.drawVignette(ctx, view.w, view.h, me ? me.hp / PLAYER.maxHp : 1, this.nowMs);
+    drawScreenLayer(ctx, {
+      world, cam: this.cam, minimap: this.minimap, effects: this.effects,
+      viewW: view.w, viewH: view.h, nowMs: this.nowMs,
+    });
   }
 
   destroy(): void {
@@ -279,18 +291,6 @@ export class GameScene implements Scene {
     // 불가능한 자리는 아예 보내지 않는다. 서버 검증은 그대로 살아 있다.
     if (!g.ok) return;
     this.ctx.conn.send({ t: 'action', action: { type: 'build', tx: g.tx, ty: g.ty, structure: this.structure } });
-  }
-
-  /** 일시정지 메뉴. 서버는 멈추지 않으므로 "계속하기"는 그냥 이 판을 닫는 것이다. */
-  private updatePause(): void {
-    if (!this.paused) {
-      this.pause.hide();
-      return;
-    }
-    this.pause.show('일시정지', '서버는 계속 돌아갑니다 — 그 자리에 서 있게 됩니다', [
-      { label: '계속하기', primary: true, onClick: () => { this.paused = false; } },
-      { label: '나가기', onClick: () => this.leave() },
-    ]);
   }
 
   private leave(): void {

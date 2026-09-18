@@ -168,6 +168,8 @@ export interface World {
   tick: number;
   /** 이 판의 준비 페이즈 길이(틱). 싱글은 짧다. */
   prepTicks: number;
+  /** 이 판의 전투 페이즈 길이(틱). 붕괴 구역이 진행도를 여기서 읽는다. */
+  combatTicks: number;
   seed: number;
   mode: ModeId;
   phase: Phase;

@@ -58,3 +58,24 @@ export const updateStatusOverlay = (
   }
   overlay.hide();
 };
+
+/**
+ * 일시정지 메뉴.
+ *
+ * 서버는 멈추지 않는다 — 그래서 "계속하기"는 이 판을 닫는 것일 뿐이고,
+ * 그 사실을 부제에 그대로 적는다(그 자리에 서 있다가 맞는 사고를 막는다).
+ */
+export const updatePauseMenu = (
+  pause: Overlay,
+  paused: boolean,
+  on: { onResume: () => void; onLeave: () => void },
+): void => {
+  if (!paused) {
+    pause.hide();
+    return;
+  }
+  pause.show('일시정지', '서버는 계속 돌아갑니다 — 그 자리에 서 있게 됩니다', [
+    { label: '계속하기', primary: true, onClick: on.onResume },
+    { label: '나가기', onClick: on.onLeave },
+  ]);
+};

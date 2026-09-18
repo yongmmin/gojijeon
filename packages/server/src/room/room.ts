@@ -11,7 +11,7 @@ import type { WebSocket } from 'ws';
 import {
   MATCH, ModeId, NET, OUTPOST, Phase, TICK_MS,
   applyAction, createPlayer, createWorld, encodeRLE, encodeServer, getMode,
-  resetMatch, respawn, standings, startRound, stepWorld,
+  isZoneShrinking, resetMatch, respawn, standings, startRound, stepWorld, zoneCenter, zoneRadius,
   type GameEvent, type GameMode, type LobbyPlayer, type NetDrop, type NetPlayer,
   type NetProjectile, type NetStructure, type Player, type PlayerAction, type PlayerId,
   type RoomInfo, type ServerMessage, type Snapshot, type World,
@@ -555,6 +555,11 @@ export class Room {
       projectiles,
       drops,
       cores: w.cores.map((c) => ({ team: c.team, tx: c.tx, ty: c.ty, hp: c.hp, maxHp: c.maxHp })),
+      zone: {
+        ...zoneCenter(),
+        radius: Math.round(zoneRadius(w)),
+        shrinking: isZoneShrinking(w),
+      },
       standings: standings(w),
       roundsToWin: MATCH.roundsToWin,
       intermissionTicks: MATCH.intermissionTicks,

@@ -5,10 +5,11 @@
  * 접속자 목록을 그 아래로 내린다.
  */
 import {
-  OUTPOST, PLAYER, Phase, TICK_HZ, TICK_MS, TILES, Tile, WEAPONS,
+  OUTPOST, PLAYER, Phase, TICK_HZ, TICK_MS, TILE, TILES, Tile, WEAPONS, ZONE,
+  type NetPlayer, type Snapshot,
 } from '@gojijeon/shared';
 import type { ClientWorld } from '../net/clientWorld';
-import { VIS } from '../render/visualConfig';
+import { VIS, ZONE_VIS } from '../render/visualConfig';
 import { teamColor } from '../render/colors';
 import { teamLabel } from '../render/teamLabel';
 import { weaponIcon } from './weaponIcon';
@@ -58,6 +59,7 @@ export class Hud {
   private readonly clockNode = el('div', { class: 'mono' });
   private readonly scoreNode = el('div', { class: 'muted' });
   private readonly phaseNote = el('div', { class: 'muted' });
+  private readonly zoneNode = el('div', { class: 'muted mono' });
   private readonly weaponNode = el('div');
   private readonly weaponIcon = weaponIcon(22);
   private readonly outpost = new OutpostBanner();
@@ -95,6 +97,7 @@ export class Hud {
       const note = PHASE_NOTE[snap.phase] ?? '';
       setText(this.phaseNote, note);
       setShown(this.phaseNote, note !== '');
+      this.updateZone(snap.zone, me);
       const remain = ((snap.phaseEndTick - snap.tick) * TICK_MS) / 1000;
       setText(this.clockNode, formatClock(remain));
       setText(this.scoreNode, `라운드 ${snap.round}   ${formatScore(world, snap.score)}`);
@@ -108,6 +111,22 @@ export class Hud {
     const hp = me ? Math.max(0, me.hp) : 0;
     this.hpFill.style.width = `${(hp / PLAYER.maxHp) * 100}%`;
     setText(this.hpText, `${Math.round(hp)} / ${PLAYER.maxHp}`);
+  }
+
+  /**
+   * 구역 한 줄. 반경만 있으면 "얼마나 남았나"가 숫자로 잡히고,
+   * 밖에 있으면 화면 경고와 같은 말을 한 번 더 한다.
+   */
+  private updateZone(zone: Snapshot['zone'] | undefined, me: NetPlayer | null): void {
+    setShown(this.zoneNode, zone !== undefined);
+    if (!zone) return;
+    const tiles = Math.round(zone.radius / TILE);
+    const out = me !== null && me.alive && Math.hypot(me.x - zone.x, me.y - zone.y) > zone.radius;
+    setText(
+      this.zoneNode,
+      out ? `구역 밖 — 초당 ${ZONE.damagePerSecond} 피해` : `구역 반경 ${tiles}칸${zone.shrinking ? ' · 좁아지는 중' : ''}`,
+    );
+    this.zoneNode.style.color = out || zone.shrinking ? ZONE_VIS.color : '';
   }
 
   /** 관전처럼 계속 붙어 있어야 하는 안내. 화면을 덮는 오버레이 대신 쓴다. */
@@ -157,7 +176,7 @@ export class Hud {
     this.phaseNode.style.letterSpacing = '2px';
     this.phaseNote.style.maxWidth = '420px';
     return el('div', { class: 'panel corner tc' }, [
-      this.phaseNode, this.clockNode, this.phaseNote, this.scoreNode,
+      this.phaseNode, this.clockNode, this.phaseNote, this.zoneNode, this.scoreNode,
     ]);
   }
 

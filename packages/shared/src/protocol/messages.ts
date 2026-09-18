@@ -139,6 +139,15 @@ export interface NetStanding {
   alive: number;
 }
 
+/** 붕괴 구역. 클라가 경계 원과 경고를 그린다. */
+export interface NetZone {
+  x: number;
+  y: number;
+  radius: number;
+  /** 지금 좁아지는 중인가. 멈춰 있을 때와 다르게 그리라는 뜻. */
+  shrinking: boolean;
+}
+
 export interface NetCore {
   team: TeamId; tx: number; ty: number; hp: number; maxHp: number;
 }
@@ -154,6 +163,7 @@ export interface Snapshot {
   drops: NetDrop[];
   cores: NetCore[];
   outpost: NetOutpost;
+  zone: NetZone;
   /** 이미 정렬된 순위표. 1위가 앞. */
   standings: NetStanding[];
   /** 매치를 가져가는 데 필요한 라운드 승수. */

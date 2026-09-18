@@ -9,6 +9,7 @@ import type { ClientWorld } from '../net/clientWorld';
 import type { Camera } from './camera';
 import { teamColor } from './colors';
 import { drawOutpostMark } from './outpostLayer';
+import { drawZoneMark } from './zoneLayer';
 import { HEALTH_VIS, VIS } from './visualConfig';
 
 export class Minimap {
@@ -50,6 +51,8 @@ export class Minimap {
 
     const snap = world.snapshot;
     if (snap) {
+      // 구역은 제일 먼저 — 어디로 가야 하는지를 판단하는 주 수단이라 다른 점에 가리면 안 된다.
+      if (snap.zone) drawZoneMark(ctx, snap.zone, x, y, k);
       // 고지는 맵 중앙 한 칸이다. 코어보다 먼저 그려 겹치면 코어가 위로 오게 둔다.
       if (snap.outpost) drawOutpostMark(ctx, snap.outpost, x, y, k);
       // 구급품은 다치고 나서 되돌아가는 물건이라, 어디 있었는지가 미니맵에 남아야 한다.

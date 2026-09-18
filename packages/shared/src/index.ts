@@ -14,6 +14,7 @@ export * from './sim/actions.js';
 export * from './sim/structures.js';
 export * from './sim/outpost.js';
 export * from './sim/standings.js';
+export * from './sim/zone.js';
 export * from './sim/match.js';
 export * from './sim/tick.js';
 export * from './protocol/messages.js';

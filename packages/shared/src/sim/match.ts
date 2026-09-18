@@ -6,7 +6,7 @@
  * 준비 페이즈에는 중앙이 봉쇄벽으로 막혀 있다. 전투 시작은 그 벽이 사라지는
  * 한 순간으로 표현된다 — 규칙을 설명할 필요 없이 눈으로 보이게 하려는 것.
  */
-import { MATCH, PLAYER, RESOURCE } from '../config/balance.js';
+import { MATCH, OUTPOST, PLAYER, RESOURCE } from '../config/balance.js';
 import { generateMap } from '../map/generator.js';
 import { tileCenter, tileXOf, tileYOf } from '../math.js';
 import { Tile } from '../tiles.js';
@@ -14,7 +14,7 @@ import type { GameMode } from '../modes/index.js';
 import { Phase, type TeamId, type World } from '../types.js';
 import { respawn, setTile } from './world.js';
 import { resetOutpost } from './outpost.js';
-import { dropResource } from './damage.js';
+import { dropHealth, dropResource } from './damage.js';
 
 const setPhase = (w: World, phase: Phase, durationTicks: number): void => {
   w.phase = phase;
@@ -88,6 +88,28 @@ const updateShardNodes = (w: World): void => {
   }
 };
 
+/**
+ * 고지 근처에 구급품을 떨군다.
+ *
+ * 중앙으로 사람을 끌어오는 또 하나의 이유다. 다친 채로 물러나 있으면
+ * 회복할 곳이 거기뿐이라, 싸우고 물러나는 대신 싸우고 버티게 된다.
+ * 고지 위가 아니라 **둘레에** 떨어뜨린다 — 주우러 가는 동안 노출되어야
+ * 위험과 보상이 맞바뀐다.
+ */
+const updateOutpostPotions = (w: World): void => {
+  if (w.phase !== Phase.COMBAT) return;
+  if (w.tick % RESOURCE.outpostPotionTicks !== 0) return;
+
+  const angle = Math.random() * Math.PI * 2;
+  const dist = OUTPOST.radius * (0.8 + Math.random() * 0.7);
+  dropHealth(
+    w,
+    tileCenter(w.outpost.tx) + Math.cos(angle) * dist,
+    tileCenter(w.outpost.ty) + Math.sin(angle) * dist,
+    RESOURCE.healthAmount,
+  );
+};
+
 /** 사망자 부활 처리. 부활 정책은 모드가 정한다. */
 const updateRespawns = (w: World, mode: GameMode): void => {
   if (!mode.allowsRespawn(w)) {
@@ -107,6 +129,7 @@ const updateRespawns = (w: World, mode: GameMode): void => {
 
 export const updateMatch = (w: World, mode: GameMode): void => {
   updateShardNodes(w);
+  updateOutpostPotions(w);
   updateRespawns(w, mode);
 
   switch (w.phase) {
