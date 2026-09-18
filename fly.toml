@@ -8,6 +8,11 @@ primary_region = "nrt"
 [build]
   dockerfile = "Dockerfile"
 
+[env]
+  # 이게 없으면 시작 배너가 컨테이너 내부 IP(172.19.x.x)를 찍는다.
+  # 로그를 보는 사람에게 아무 쓸모가 없는 주소다.
+  PUBLIC_URL = "https://gojijeon.fly.dev"
+
 # ⚠️ 반드시 머신 **한 대**로 띄운다.
 #
 # 방이 메모리에 있다. 두 대가 뜨면 접속이 분산되면서 **같은 코드를 친 사람이
