@@ -15,7 +15,8 @@ import {
   damageTile, dropHealth, dropResource, dropWeapon, encodeRLE, ffaMode, generateMap, getTile,
   killPlayer, lootOdds, pickSpawn,
   ModeId, pickup, respawn, rollTileHealth,
-  rollTileLoot, rollWeapon, standings, startRound, stepWorld, teamMode, tileCenter, tileDps,
+  rollTileLoot, rollWeapon, standings, startRound, stepWorld, swingSeconds, teamMode,
+  tileCenter, tileDps,
   tileIndex,
 } from '@gojijeon/shared';
 
@@ -617,6 +618,44 @@ test('가중치 추첨은 표의 비율을 따른다', () => {
   assert.ok(Math.abs(total - 100) < 0.001, `확률 합이 ${total}%`);
   // 곡괭이는 땅에서 나오지 않는다. 이미 들고 시작하므로 꽝이 된다.
   assert.equal(odds.some((o) => o.id === WeaponId.PICKAXE), false);
+});
+
+test('어느 무기도 드랍 표를 독차지하지 않는다', () => {
+  // 단검이 30%였을 때 "단검만 너무 많이 뜬다"는 말이 나왔다.
+  // 한 무기가 4분의 1을 넘으면 발굴이 뽑기가 아니라 확정에 가까워진다.
+  for (const o of lootOdds()) {
+    assert.ok(
+      o.percent <= 25,
+      `${WEAPONS[o.id].name}가 ${o.percent.toFixed(0)}% — 이것만 계속 나온다`,
+    );
+  }
+  // 반대로 너무 희귀하면 존재를 모르게 된다.
+  for (const o of lootOdds()) {
+    assert.ok(o.percent >= 5, `${WEAPONS[o.id].name}가 ${o.percent.toFixed(0)}% — 평생 못 본다`);
+  }
+});
+
+test('표창은 활과 근접 사이를 메운다', () => {
+  const dps = (w) => (w.projectile ? w.projectile.damage : w.damage) / swingSeconds(w);
+  const star = WEAPONS.shuriken;
+
+  assert.equal(star.kind, 'ranged');
+  assert.ok(star.projectile, '표창인데 날아가는 것이 없다');
+
+  // 사거리: 근접보다 멀고 활보다 짧다.
+  assert.ok(star.range > WEAPONS.spear.range, '창보다 가까우면 원거리라 할 수 없다');
+  assert.ok(star.range < WEAPONS.bow.range, '활만큼 멀면 활을 들 이유가 없다');
+
+  // 위력: 활보다 세고 창보다 약하다. 안전한 거리에서 쏘는 대가다.
+  assert.ok(dps(star) > dps(WEAPONS.bow), '활보다 약하면 가까이 갈 이유가 없다');
+  assert.ok(dps(star) < dps(WEAPONS.spear), '창보다 세면 근접을 들 이유가 없다');
+});
+
+test('새 무기는 표에 넣는 것만으로 드랍에 들어간다', () => {
+  // 레지스트리가 진실이라는 규칙의 확인. 추첨 표는 dropWeight에서 파생된다.
+  const pool = LOOT_POOL.map((w) => w.id);
+  assert.ok(pool.includes(WeaponId.SHURIKEN), '표창이 드랍 표에 없다');
+  assert.equal(pool.length, Object.keys(WEAPONS).length - 1, '곡괭이 말고는 전부 나와야 한다');
 });
 
 test('흙벽을 뚫으면 확률적으로 무기가 나온다', () => {

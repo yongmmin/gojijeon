@@ -9,7 +9,23 @@
 import { weaponDef, type WeaponId } from '@gojijeon/shared';
 import { MATERIAL as M } from './visualConfig';
 import { shade, withAlpha } from './colors';
+import { drawWeaponSprite } from './weaponSprites';
 import type { Pose } from '../net/snapshotBuffer';
+
+/**
+ * 같은 kind 안에서도 나는 모양이 다른 무기가 있다(활은 곧게 날고 표창은 돈다).
+ * 무기 id로 코드를 가르는 대신 **그림 표**를 두고, 없으면 kind 폴백으로 간다 —
+ * 원거리 무기가 또 생겨도 이 파일은 그대로다.
+ */
+type ProjectileDraw = (
+  ctx: CanvasRenderingContext2D,
+  pose: Pose,
+  r: number,
+  weapon: WeaponId,
+  color: string,
+  nowMs: number,
+  id: number,
+) => void;
 
 export const drawProjectile = (
   ctx: CanvasRenderingContext2D,
@@ -18,9 +34,15 @@ export const drawProjectile = (
   weapon: WeaponId | null,
   color: string,
   nowMs: number,
+  id: number,
 ): void => {
   if (weapon === null) {
     drawBolt(ctx, pose, r, color, nowMs);
+    return;
+  }
+  const custom = PROJECTILE_ART[weapon];
+  if (custom) {
+    custom(ctx, pose, r, weapon, color, nowMs, id);
     return;
   }
   if (weaponDef(weapon).kind === 'throwable') {
@@ -28,6 +50,49 @@ export const drawProjectile = (
     return;
   }
   drawArrow(ctx, pose, r, color);
+};
+
+/**
+ * 제 축으로 빠르게 도는 것. 화살과의 결정적 차이가 회전이라 진행 방향과 무관하게 돈다.
+ * 손에 든 그림을 그대로 돌리므로 "주운 것이 저것"이 한 번에 붙는다.
+ */
+const spinning: ProjectileDraw = (ctx, pose, r, weapon, color, nowMs, id) => {
+  // id를 위상에 섞지 않으면 여러 개가 한 몸처럼 같은 각도로 돈다.
+  const spin = nowMs / 38 + id * 1.7;
+
+  ctx.save();
+  ctx.fillStyle = withAlpha(color, 0.16);
+  ctx.beginPath();
+  ctx.arc(pose.x, pose.y, r * 3.4, 0, Math.PI * 2);
+  ctx.fill();
+  // 짧은 꼬리. 회전만 있으면 날아가는 중인지 멈춰 있는지 알 수 없다.
+  ctx.strokeStyle = withAlpha(color, 0.3);
+  ctx.lineWidth = r * 1.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pose.x - Math.cos(pose.aim) * r * 7, pose.y - Math.sin(pose.aim) * r * 7);
+  ctx.lineTo(pose.x, pose.y);
+  ctx.stroke();
+  ctx.restore();
+
+  if (drawWeaponSprite(ctx, weapon, pose.x, pose.y, spin, { scale: 0.9 })) return;
+
+  // 스프라이트가 아직 안 구워졌을 때. 도는 십자 하나로 버틴다.
+  ctx.save();
+  ctx.translate(pose.x, pose.y);
+  ctx.rotate(spin);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r * 2, 0); ctx.lineTo(r * 2, 0);
+  ctx.moveTo(0, -r * 2); ctx.lineTo(0, r * 2);
+  ctx.stroke();
+  ctx.restore();
+};
+
+const PROJECTILE_ART: Partial<Record<WeaponId, ProjectileDraw>> = {
+  shuriken: spinning,
 };
 
 /** 활에서 나온 것. 진행 방향으로 늘어난 몸체 + 짧은 잔상이 속도를 보여준다. */

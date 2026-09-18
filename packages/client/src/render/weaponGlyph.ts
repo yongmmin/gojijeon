@@ -95,9 +95,12 @@ const drawSlashTrail = (
   pose: SwingPose,
 ): void => {
   const inner = PLAYER.radius + 2;
-  // 사거리를 그대로 쓰면 안 된다 — 폭탄의 range는 던지는 거리라 화면 절반이 잔상이 된다.
-  // 잔상은 팔이 훑은 자리만큼만.
-  const outer = Math.min(Math.max(inner + 6, def.range * 0.9), PLAYER.radius + 40);
+  // 잔상은 팔이 훑은 자리만큼만이다. 사거리를 그대로 쓰면 폭탄(던지는 거리)이나
+  // 표창(7칸)에서 화면 절반이 잔상이 되어 근접 베기처럼 보인다. 무기가 실제로
+  // 닿는 근접만 사거리를 따라가고, 나머지는 손목이 도는 만큼만 남긴다.
+  const outer = def.kind === 'melee'
+    ? Math.min(Math.max(inner + 6, def.range * 0.9), PLAYER.radius + 40)
+    : inner + 12;
   const from = s.aim + pose.trailFrom;
   const to = s.aim + pose.angle;
   const ccw = to < from;

@@ -60,7 +60,7 @@ export const drawEntities = (
 
   for (const pr of snap.projectiles) {
     const pose = sample.projectiles.get(pr.id) ?? { x: pr.x, y: pr.y, aim: Math.atan2(pr.vy, pr.vx) };
-    drawProjectile(ctx, pose, pr.r, pr.weapon, teamColor(pr.team), nowMs);
+    drawProjectile(ctx, pose, pr.r, pr.weapon, teamColor(pr.team), nowMs, pr.id);
   }
 
   anim.observe(snap.players, nowMs);

@@ -61,6 +61,13 @@ const windupScale = (def: WeaponDef): number =>
   clamp01(0.55 + (def.windupTicks * TICK_MS) / 900);
 
 /**
+ * 0이면 겨눠서 쏘는 것(활), 1에 가까우면 손목으로 뿌리는 것(표창).
+ * 겨눌 시간이 있느냐 없느냐가 그대로 자세가 된다.
+ */
+const flick = (def: WeaponDef): number =>
+  clamp01(1 - def.windupTicks / SWING.flickWindupTicks);
+
+/**
  * @param swing 판정까지 남은 틱. 0이면 대기.
  * @param sinceHitMs 마지막 타격으로부터 지난 시간(ms). 타격 기록이 없으면 Infinity.
  */
@@ -77,8 +84,16 @@ const windupPose = (def: WeaponDef, p: number): SwingPose => {
   const e = easeOut(p) * windupScale(def);
   const charge = p;
   switch (def.kind) {
-    case 'ranged':
-      return { phase: 'windup', angle: -0.14 * e, reach: -3 * e, trail: 0, trailFrom: 0, pull: easeOut(p), charge };
+    case 'ranged': {
+      // 당기는 쪽은 뒤로 물러나기만 하고, 뿌리는 쪽은 손목을 크게 젖힌다.
+      const f = flick(def);
+      return {
+        phase: 'windup',
+        angle: -(0.14 + 1.05 * f) * e,
+        reach: -(3 + 3 * f) * e,
+        trail: 0, trailFrom: 0, pull: easeOut(p), charge,
+      };
+    }
     case 'throwable':
       return { phase: 'windup', angle: -1.15 * e, reach: -4 * e, trail: 0, trailFrom: 0, pull: 0, charge };
     case 'shield':
@@ -102,12 +117,18 @@ const afterHitPose = (def: WeaponDef, r: number): SwingPose => {
   const s = clamp01(r / SWING.strikeRatio);
 
   switch (def.kind) {
-    // 쏜 직후 뒤로 밀렸다가 제자리로. 시위는 풀려 있으므로 pull은 0.
-    case 'ranged':
+    // 당긴 쪽은 반동으로 뒤로 밀리고, 뿌린 쪽은 손이 앞으로 따라 나간다.
+    // 시위는 이미 풀렸으므로 pull은 어느 쪽이든 0이다.
+    case 'ranged': {
+      const f = flick(def);
+      const decay = (1 - r) ** 2;
       return {
-        phase, angle: 0.12 * (1 - r) ** 2, reach: -SWING.bowRecoil * (1 - r) ** 2,
-        trail: 0, trailFrom: 0, pull: 0, charge: 0,
+        phase,
+        angle: (0.12 + 0.75 * f) * decay,
+        reach: -SWING.bowRecoil * (1 - f) * decay + SWING.throwPush * 0.55 * f * decay,
+        trail: f * 0.35 * decay, trailFrom: -0.9, pull: 0, charge: 0,
       };
+    }
     // 던지는 팔이 앞으로 뻗었다가 돌아온다. 무기는 이미 손을 떠났을 수 있다.
     case 'throwable':
       return {

@@ -61,6 +61,19 @@ const dagger = (c: string): string =>
   bladed(`<path d="M43 12 L74 17 L97 22 L74 27 L43 32 Z" fill="${c}"/>`) +
   gloss(`<path d="M48 22 L88 22" stroke="${M.gloss}" stroke-width="2.4"/>`);
 
+// ── 표창 ──────────────────────────────────────────────────────────────────────
+// 네 갈래 별. 손가락에 끼우는 물건이라 작고, 날붙이 셋 중 유일하게 **자루가 없다** —
+// 단검·창과 실루엣이 겹치지 않는 지점이 거기다.
+const shuriken = (c: string): string =>
+  bladed(
+    `<path d="M32 2 L40 24 L62 32 L40 40 L32 62 L24 40 L2 32 L24 24 Z" fill="${c}"/>`,
+  ) +
+  inked(`<circle cx="32" cy="32" r="6" fill="${M.outline}"/>`) +
+  gloss(
+    `<path d="M32 8 L36 26" stroke="${M.gloss}" stroke-width="2.4"/>` +
+    `<path d="M8 32 L26 36" stroke="${M.gloss}" stroke-width="2.4"/>`,
+  );
+
 // ── 창 ────────────────────────────────────────────────────────────────────────
 // 긴 자루 + 나뭇잎 모양 날. 화면에서 가장 긴 무기라 사거리가 그림만으로 읽힌다.
 const spear = (c: string): string =>
@@ -139,6 +152,8 @@ const bomb = (c: string): string =>
 export const WEAPON_ART: Partial<Record<WeaponId, WeaponArt>> = {
   pickaxe: { vw: 102, vh: 52, len: 31, grip: [0.14, 0.5], body: pickaxe },
   dagger: { vw: 100, vh: 44, len: 25, grip: [0.13, 0.5], body: dagger },
+  // 손가락에 끼운 물건이라 손 바로 앞에 붙는다(그립이 거의 한가운데).
+  shuriken: { vw: 64, vh: 64, len: 18, grip: [0.42, 0.5], body: shuriken },
   spear: { vw: 126, vh: 40, len: 52, grip: [0.13, 0.5], body: spear },
   bow: { vw: 84, vh: 104, len: 31, grip: [0.55, 0.5], body: bow, pulled: bowPulled },
   shield: { vw: 60, vh: 96, len: 22, grip: [0.42, 0.5], body: shield },

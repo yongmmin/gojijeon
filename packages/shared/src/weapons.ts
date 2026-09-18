@@ -17,6 +17,7 @@ import { TICK_HZ, TILE, secs } from './config/balance.js';
 export const WeaponId = {
   PICKAXE: 'pickaxe',
   DAGGER: 'dagger',
+  SHURIKEN: 'shuriken',
   SPEAR: 'spear',
   BOW: 'bow',
   SHIELD: 'shield',
@@ -117,16 +118,26 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   }),
   [WeaponId.DAGGER]: def({
     id: WeaponId.DAGGER, name: '단검', kind: 'melee', color: '#f87171',
-    blurb: '짧고 빠르다. 붙으면 이기지만 거리를 벌리면 아무것도 못 한다.',
-    dropWeight: 30, rarity: 'common',
+    blurb: '짧고 빠르다. 붙으면 이기지만 거리를 벌리면 아무것도 못 한다. 흔했었지만 이제는 아니다.',
+    dropWeight: 16, rarity: 'common',
     damage: 16, range: TILE * 1.1, halfArc: Math.PI / 4,
     windupTicks: secs(0.08), recoverTicks: secs(0.22),
     speedMultiplier: 1.15,
   }),
+  [WeaponId.SHURIKEN]: def({
+    id: WeaponId.SHURIKEN, name: '표창', kind: 'ranged', color: '#2dd4bf',
+    blurb: '작게 자주 맞힌다. 활만큼 멀리 못 가지만 훨씬 빠르고, 붙어도 쏠 수 있다.',
+    dropWeight: 18, rarity: 'common',
+    // 활(12칸)과 근접(1~2칸) 사이를 메운다. 중거리에서 견제하는 자리.
+    range: TILE * 7,
+    windupTicks: secs(0.08), recoverTicks: secs(0.22),
+    speedMultiplier: 1.05,
+    projectile: { speed: 620, radius: 3, damage: 9, lifetimeTicks: secs(0.6), tileDamage: 2 },
+  }),
   [WeaponId.SPEAR]: def({
     id: WeaponId.SPEAR, name: '창', kind: 'melee', color: '#fbbf24',
     blurb: '근접 중 가장 길다. 선딜이 길어 헛치면 그대로 얻어맞는다.',
-    dropWeight: 15, rarity: 'uncommon',
+    dropWeight: 13, rarity: 'uncommon',
     damage: 30, range: TILE * 2.3, halfArc: Math.PI / 9,
     windupTicks: secs(0.3), recoverTicks: secs(0.5),
     speedMultiplier: 0.95,
@@ -148,7 +159,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   [WeaponId.SHIELD]: def({
     id: WeaponId.SHIELD, name: '방패', kind: 'shield', color: '#60a5fa',
     blurb: '공격이 없다. 대신 정면을 거의 무효화한다. 좁은 통로를 혼자 막는 역할.',
-    dropWeight: 17, rarity: 'common',
+    dropWeight: 12, rarity: 'uncommon',
     damage: 4, range: TILE * 1.0,
     windupTicks: secs(0.1), recoverTicks: secs(0.7),
     speedMultiplier: 0.78,
@@ -157,7 +168,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   [WeaponId.HAMMER]: def({
     id: WeaponId.HAMMER, name: '망치', kind: 'melee', color: '#c084fc',
     blurb: '짓고 부순다. 전투력은 낮지만 이게 없으면 기지가 없다.',
-    dropWeight: 22, rarity: 'common',
+    dropWeight: 18, rarity: 'common',
     // 곡괭이를 올린 만큼 같이 올린다. 도구가 기본 지급품보다 약하면
     // 망치를 드는 이유가 건설밖에 안 남는다.
     damage: 15, range: TILE * 1.3,
@@ -167,8 +178,8 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   }),
   [WeaponId.BOMB]: def({
     id: WeaponId.BOMB, name: '폭탄', kind: 'throwable', color: '#fb923c',
-    blurb: '벽을 통째로 지운다. 한 번 쓰면 사라지고, 던진 뒤 당신은 맨손이다. 좀처럼 안 나온다.',
-    dropWeight: 5, rarity: 'rare',
+    blurb: '벽을 통째로 지운다. 한 번 쓰면 사라지고, 던진 뒤 당신은 맨손이다.',
+    dropWeight: 12, rarity: 'uncommon',
     range: TILE * 6,
     windupTicks: secs(0.3), recoverTicks: secs(0.6),
     speedMultiplier: 0.9,
