@@ -313,18 +313,24 @@ docker run -p 8080:8080 -e PUBLIC_URL="http://내주소:8080" gojijeon
 ### Fly.io
 
 ```bash
-flyctl auth login          # 직접 로그인해야 합니다
+flyctl auth login                          # 직접 로그인해야 합니다
 flyctl apps create gojijeon --org personal
-flyctl deploy
+npm run deploy                             # = flyctl deploy --remote-only --ha=false
+npm run deploy:check                       # 머신이 정말 한 대인지 확인
 ```
+
+**`fly deploy`를 맨손으로 치지 마세요.** Fly가 고가용성 명목으로 두 번째
+머신을 자동으로 띄웁니다. `npm run deploy`에 `--ha=false`를 박아 둔 이유입니다.
 
 [`fly.toml`](fly.toml)에 도쿄 리전(`nrt`)과 `/health` 헬스체크가 잡혀 있고,
 **컨테이너를 재우지 않도록** 해두었습니다 — 방이 메모리에 있어서 자면
 진행 중인 판이 사라집니다.
 
-> 머신이 하나여야 합니다. 여러 대로 늘리면 접속이 분산되면서
-> **같은 코드를 친 사람이 서로 다른 머신의 다른 방에 들어갑니다.**
-> 여러 대가 필요해지면 방 상태를 Redis 같은 곳으로 빼야 합니다.
+> **머신은 반드시 한 대여야 합니다.** 여러 대로 늘리면 접속이 분산되면서
+> 같은 코드를 친 사람이 서로 다른 머신의 다른 방에 들어가 영영 못 만납니다.
+> 실제로 첫 배포에서 Fly가 두 대를 띄워 이 문제를 만들었고, 그래서
+> 배포 명령에 `--ha=false`를 고정했습니다.
+> 여러 대가 정말 필요해지면 방 상태를 Redis 같은 곳으로 빼야 합니다.
 
 ---
 

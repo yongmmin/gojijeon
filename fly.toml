@@ -8,10 +8,22 @@ primary_region = "nrt"
 [build]
   dockerfile = "Dockerfile"
 
+# ⚠️ 반드시 머신 **한 대**로 띄운다.
+#
+# 방이 메모리에 있다. 두 대가 뜨면 접속이 분산되면서 **같은 코드를 친 사람이
+# 서로 다른 머신의 다른 방에 들어간다.** 서로 영영 못 만난다.
+#
+# Fly는 첫 배포에서 고가용성 명목으로 두 번째 머신을 자동으로 띄운다.
+# 이 파일만으로는 막을 수 없고 배포 명령에 --ha=false 를 줘야 한다.
+# 그래서 `npm run deploy`에 그 플래그를 박아 두었다 — 맨손으로 `fly deploy`를
+# 치면 다시 두 대가 된다.
+#
+# 여러 대가 정말 필요해지면 방 상태를 Redis 같은 곳으로 빼야 한다.
+
 [http_service]
   internal_port = 8080
   force_https = true
-  # 방이 메모리에 있다. 컨테이너가 자면 진행 중인 판이 사라지므로 재우지 않는다.
+  # 자면 진행 중인 판이 사라진다. 재우지 않는다.
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
